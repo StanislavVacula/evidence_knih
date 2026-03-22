@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "879939169058",
+    "project_id": "evidence-knih-d5dd1",
+    "storage_bucket": "evidence-knih-d5dd1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879939169058:android:9531d176f756ef2d75137b",
+        "android_client_info": {
+          "package_name": "com.example.evidence_knih"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHL_0iM5ALTL6qzpKkcPdwJI6KxWuJrbM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
