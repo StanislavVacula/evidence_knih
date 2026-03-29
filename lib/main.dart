@@ -21,9 +21,18 @@ class MyApp extends StatelessWidget {
       title: 'Knihovna v Cloudu',
       theme: ThemeData(
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
+          seedColor: const Color(0xFF1976D2),
           brightness: Brightness.light,
+          primary: const Color(0xFF1976D2), 
+          secondary: const Color(0xFF1E88E5),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1976D2),
+          foregroundColor: Colors.white,
+          elevation: 2,
+          titleTextStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
         ),
       ),
       home: const HomePage(),
@@ -42,61 +51,123 @@ class _HomePageState extends State<HomePage> {
   final CollectionReference _knihyCollection =
       FirebaseFirestore.instance.collection('knihy');
 
-  // PŘIDÁNÍ KNIHY
-  Future<void> _addBook(String nazev, String autor, int rok, int hodnoceni, String komentar) {
+  // PŘIDÁNÍ KNIHY (přidáno pole 'precteno')
+  Future<void> _addBook(String nazev, String autor, int rok, int hodnoceni, String komentar, int stranka, bool precteno) {
     return _knihyCollection.add({
       'nazev': nazev,
       'autor': autor,
       'rok': rok,
       'hodnoceni': hodnoceni,
       'komentar': komentar,
+      'stranka': stranka,
+      'precteno': precteno,
       'datum_pridani': FieldValue.serverTimestamp(),
     });
   }
 
-  // ÚPRAVA KNIHY (Update)
-  Future<void> _updateBook(String id, String nazev, String autor, int rok, int hodnoceni, String komentar) {
+  // ÚPRAVA KNIHY
+  Future<void> _updateBook(String id, String nazev, String autor, int rok, int hodnoceni, String komentar, int stranka, bool precteno) {
     return _knihyCollection.doc(id).update({
       'nazev': nazev,
       'autor': autor,
       'rok': rok,
       'hodnoceni': hodnoceni,
       'komentar': komentar,
+      'stranka': stranka,
+      'precteno': precteno,
     });
   }
 
   // SMAZÁNÍ KNIHY
-  Future<void> _deleteBook(String id) {
-    return _knihyCollection.doc(id).delete();
+  Future<void> _confirmDelete(String id, String nazev) async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, 
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text("Smazat knihu?"),
+        content: Text("Opravdu chcete smazat knihu '$nazev'? Tato akce je nevratná."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("ZRUŠIT"),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red[700]), 
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text("SMAZAT"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _knihyCollection.doc(id).delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Kniha '$nazev' byla smazána."),
+            backgroundColor: Colors.black87,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
-  // SPOLEČNÝ DIALOG PRO PŘIDÁNÍ I ÚPRAVU
+  Color _getRatingColor(int rating) {
+    if (rating >= 8) return Colors.green[700]!; 
+    if (rating >= 5) return Colors.orange[700]!; 
+    return Colors.red[700]!; 
+  }
+
+  // DIALOG S PŘEPÍNAČEM PŘEČTENO / STRÁNKA
   void _showBookDialog({String? docId, Map<String, dynamic>? data}) {
     final formKey = GlobalKey<FormState>();
     final nazevController = TextEditingController(text: data?['nazev'] ?? '');
     final autorController = TextEditingController(text: data?['autor'] ?? '');
     final rokController = TextEditingController(text: data?['rok']?.toString() ?? '');
+    final strankaController = TextEditingController(text: data?['stranka']?.toString() ?? '0');
     final komentarController = TextEditingController(text: data?['komentar'] ?? '');
     int rating = data?['hodnoceni'] ?? 5;
+    bool isPrecteno = data?['precteno'] ?? false;
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      barrierDismissible: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20, right: 20, top: 20,
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: Colors.white, 
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: const EdgeInsets.all(20),
+          titlePadding: EdgeInsets.zero,
+          title: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1976D2),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  docId == null ? "PŘIDAT KNIHU" : "UPRAVIT KNIHU",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
           ),
-          child: SingleChildScrollView(
+          content: SingleChildScrollView(
             child: Form(
               key: formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(docId == null ? "Nová kniha" : "Upravit knihu", style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 10),
                   TextFormField(
                     controller: nazevController,
                     decoration: const InputDecoration(labelText: "Název", border: OutlineInputBorder()),
@@ -109,18 +180,50 @@ class _HomePageState extends State<HomePage> {
                     validator: (v) => v!.isEmpty ? "Vyplňte autora" : null,
                   ),
                   const SizedBox(height: 10),
-                  TextFormField(
-                    controller: rokController,
-                    decoration: const InputDecoration(labelText: "Rok vydání", border: OutlineInputBorder()),
-                    keyboardType: TextInputType.number,
-                    validator: (v) => int.tryParse(v ?? '') == null ? "Zadejte rok" : null,
+                  
+                  // PŘEPÍNAČ PŘEČTENO
+                  CheckboxListTile(
+                    title: const Text("Již přečteno?"),
+                    value: isPrecteno,
+                    activeColor: const Color(0xFF1976D2),
+                    onChanged: (bool? value) {
+                      setStateDialog(() {
+                        isPrecteno = value ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: rokController,
+                          decoration: const InputDecoration(labelText: "Rok", border: OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                          validator: (v) => int.tryParse(v ?? '') == null ? "Rok?" : null,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // POLÍČKO STRÁNKA (Zobrazí se jen pokud není přečteno)
+                      if (!isPrecteno)
+                        Expanded(
+                          child: TextFormField(
+                            controller: strankaController,
+                            decoration: const InputDecoration(labelText: "Stránka", border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 15),
-                  Text("Moje hodnocení: $rating/10"),
+                  Text("Moje hodnocení: $rating/10", style: const TextStyle(fontWeight: FontWeight.bold)),
                   Slider(
                     value: rating.toDouble(),
                     min: 1, max: 10, divisions: 9,
                     label: rating.toString(),
+                    activeColor: const Color(0xFF1976D2), 
                     onChanged: (v) => setStateDialog(() => rating = v.toInt()),
                   ),
                   TextFormField(
@@ -133,25 +236,26 @@ class _HomePageState extends State<HomePage> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
+                        backgroundColor: const Color(0xFF1976D2),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onPressed: () {
                         if (formKey.currentState!.validate()) {
+                          int curPage = isPrecteno ? 0 : (int.tryParse(strankaController.text) ?? 0);
                           if (docId == null) {
-                            _addBook(nazevController.text, autorController.text, int.parse(rokController.text), rating, komentarController.text);
+                            _addBook(nazevController.text, autorController.text, int.parse(rokController.text), rating, komentarController.text, curPage, isPrecteno);
                           } else {
-                            _updateBook(docId, nazevController.text, autorController.text, int.parse(rokController.text), rating, komentarController.text);
+                            _updateBook(docId, nazevController.text, autorController.text, int.parse(rokController.text), rating, komentarController.text, curPage, isPrecteno);
                           }
                           Navigator.pop(context);
                         }
                       },
                       icon: const Icon(Icons.cloud_done),
-                      label: Text(docId == null ? "ULOŽIT DO CLOUDU" : "AKTUALIZOVAT"),
+                      label: Text(docId == null ? "ULOŽIT" : "AKTUALIZOVAT"),
                     ),
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -164,59 +268,90 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text("📚 Evidence Knih"),
         centerTitle: true,
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
-        elevation: 4,
       ),
-      body: StreamBuilder(
-        stream: _knihyCollection.orderBy('datum_pridani', descending: true).snapshots(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Něco se nepovedlo..."));
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          double preferredWidth = constraints.maxWidth > 800 ? 800 : constraints.maxWidth;
+          return Center(
+            child: SizedBox(
+              width: preferredWidth, 
+              child: StreamBuilder(
+                stream: _knihyCollection.orderBy('datum_pridani', descending: true).snapshots(),
+                builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+                  if (snapshot.hasError) return const Center(child: Text("Chyba databáze!"));
+                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
-          if (snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("Knihovna je prázdná", style: TextStyle(fontSize: 18, color: Colors.grey)));
-          }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    itemCount: snapshot.data!.docs.length,
+                    itemBuilder: (context, index) {
+                      var doc = snapshot.data!.docs[index];
+                      var data = doc.data() as Map<String, dynamic>;
+                      Color hodnoceniBarva = _getRatingColor(data['hodnoceni']);
+                      bool precteno = data['precteno'] ?? false;
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              var doc = snapshot.data!.docs[index];
-              var data = doc.data() as Map<String, dynamic>;
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: ListTile(
-                  onTap: () => _showBookDialog(docId: doc.id, data: data), // KLIKNUTÍM UPRAVÍŠ
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.teal[100],
-                    child: Text("${data['hodnoceni']}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-                  ),
-                  title: Text(data['nazev'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  subtitle: Text("${data['autor']} • ${data['rok']}\n${data['komentar'] ?? ''}"),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
-                    onPressed: () => _deleteBook(doc.id),
-                  ),
-                ),
-              );
-            },
+                      return Card(
+                        elevation: 2,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        child: ListTile(
+                          onTap: () => _showBookDialog(docId: doc.id, data: data),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          leading: CircleAvatar(
+                            backgroundColor: hodnoceniBarva.withOpacity(0.1),
+                            radius: 28,
+                            child: Text("${data['hodnoceni']}", style: TextStyle(fontWeight: FontWeight.bold, color: hodnoceniBarva, fontSize: 20)),
+                          ),
+                          title: Text(data['nazev'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 6.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("${data['autor']} • ${data['rok']}"),
+                                const SizedBox(height: 6),
+                                // PODMÍNĚNÉ ZOBRAZENÍ STAVU
+                                precteno 
+                                  ? const Row(
+                                      children: [
+                                        Icon(Icons.check_circle, size: 16, color: Colors.green),
+                                        SizedBox(width: 5),
+                                        Text("Přečteno", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                      ],
+                                    )
+                                  : Row(
+                                      children: [
+                                        const Icon(Icons.menu_book, size: 16, color: Color(0xFF1976D2)),
+                                        SizedBox(width: 5),
+                                        Text("Aktuálně na straně: ${data['stranka'] ?? 0}", style: const TextStyle(color: Color(0xFF1976D2))),
+                                      ],
+                                    ),
+                              ],
+                            ),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                            onPressed: () => _confirmDelete(doc.id, data['nazev']),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
           );
-        },
+        }
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _showBookDialog(),
-        backgroundColor: Colors.teal,
+        backgroundColor: const Color(0xFF1976D2),
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text("Nová kniha"),
+        child: const Icon(Icons.add),
       ),
     );
   }
